@@ -1,7 +1,9 @@
 from typing import Callable, Tuple, Union
+from . import util
 
-# flow calculations
+# circumference calcs for arcs
 # minimize feedrate output
+# draw absolute
 class Gcode:
     def __init__(
         self,
@@ -10,6 +12,9 @@ class Gcode:
         line_width: float = 0.4,
         filament_width: float = 1.75,
         home_position: Tuple[float, float, float] = (0, 0, 0),
+        extrusion_length_calculator: Callable[
+            [float, float, float, float], float
+        ] = util.calculate_extrusion_length,
     ) -> None:
         self.filename = filename
         self.file = open(filename, "w")
@@ -17,6 +22,7 @@ class Gcode:
         self.line_width = line_width
         self.filament_width = filament_width
         self.home_pos = home_position
+        self.extrusion_length_calculator = extrusion_length_calculator
         self.pos = [None] * 3
         self.e = None
 
@@ -38,6 +44,15 @@ class Gcode:
 
     def get_e(self) -> float:
         return self.e
+
+    def set_layer_height(self, layer_height: float):
+        self.layer_height = layer_height
+
+    def set_line_width(self, line_width: float):
+        self.line_width = line_width
+
+    def set_filament_width(self, filament_width: float):
+        self.filament_width = filament_width
 
     def zero_extruder(self):
         self.file.write("G92 E0\n")
@@ -114,7 +129,12 @@ class Gcode:
         self, delta: Tuple[float, float, float], e: float = None, feedrate: int = 2400
     ):
         if e is None:
-            e = 0  # REPLACE
+            e = self.extrusion_length_calculator(
+                util.dist(delta),
+                self.line_width,
+                self.layer_height,
+                self.filament_width,
+            )
         self.pos[0] += delta[0]
         self.pos[1] += delta[1]
         self.pos[2] += delta[2]
@@ -133,7 +153,12 @@ class Gcode:
         feedrate: int = 2400,
     ):
         if e is None:
-            e = 0  # REPLACE
+            e = self.extrusion_length_calculator(
+                util.dist(delta),  # REPLACE
+                self.line_width,
+                self.layer_height,
+                self.filament_width,
+            )
         out = "G2" if clockwise else "G3"
         out += f" F{feedrate}"
         self.pos[0] += delta[0]
@@ -158,7 +183,12 @@ class Gcode:
         feedrate: int = 2400,
     ):
         if e is None:
-            e = 0  # REPLACE
+            e = self.extrusion_length_calculator(
+                util.dist(delta),  # REPLACE
+                self.line_width,
+                self.layer_height,
+                self.filament_width,
+            )
         if delta[0] == 0.0 and delta[1] == 0.0:
             raise ValueError("Both x and y cannot be 0. Make sure to set at least one!")
         out = "G2" if clockwise else "G3"
