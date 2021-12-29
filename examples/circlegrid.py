@@ -15,7 +15,7 @@ for i in range(3):
     g.travel((0, 20, 0))
     for j in range(3):
         g.travel((20, 0, 0))
-        g.draw_arc(5, 0, -10)
+        g.draw_arc(0, -10, e=5)
     g.travel((-60, 0, 0))
 
 g.set_tool_temp(0)

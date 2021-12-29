@@ -1,42 +1,57 @@
-from typing import Tuple
+from typing import Callable, Tuple, Union
 
-# get printer info in constructor for homing
+# flow calculations
+# minimize feedrate output
 class Gcode:
-    def __init__(self, filename: str) -> None:
+    def __init__(
+        self,
+        filename: str,
+        layer_height: float = 0.2,
+        line_width: float = 0.4,
+        filament_width: float = 1.75,
+        home_position: Tuple[float, float, float] = (0, 0, 0),
+    ) -> None:
         self.filename = filename
         self.file = open(filename, "w")
-        self.pos = [None] * 4
+        self.layer_height = layer_height
+        self.line_width = line_width
+        self.filament_width = filament_width
+        self.home_pos = home_position
+        self.pos = [None] * 3
+        self.e = None
 
     def close(self):
         self.file.close()
 
     def home(self):
         self.file.write("G28\n")
-        self.pos = [0, 0, 0] + [self.pos[-1]]
+        self.pos = list(self.home_pos)
 
-    def get_x(self):
+    def get_x(self) -> float:
         return self.pos[0]
 
-    def get_y(self):
+    def get_y(self) -> float:
         return self.pos[1]
 
-    def get_z(self):
+    def get_z(self) -> float:
         return self.pos[2]
 
-    def get_e(self):
-        return self.pos[3]
+    def get_e(self) -> float:
+        return self.e
 
     def zero_extruder(self):
         self.file.write("G92 E0\n")
-        self.pos[-1] = 0
+        self.e = 0
 
-    def set_tool_temp(self, temperature: int, tool_index=0):
+    def set_tool_temp(self, temperature: int, tool_index: int = 0):
         out = f"M104 S{temperature}"
         if tool_index != 0:
             out += f" T{tool_index}"
         self.file.write(out + "\n")
 
-    def wait_tool_temp(self, temperature: int, tool_index=0, on_cool=False):
+    def wait_tool_temp(
+        self, temperature: int, tool_index: int = 0, on_cool: bool = False
+    ):
         out = "M109"
         if on_cool:
             out += f" R{temperature}"
@@ -50,7 +65,7 @@ class Gcode:
         out = f"M140 S{temperature}"
         self.file.write(out + "\n")
 
-    def wait_bed_temp(self, temperature: int, on_cool=False):
+    def wait_bed_temp(self, temperature: int, on_cool: bool = False):
         out = "M190"
         if on_cool:
             out += f" R{temperature}"
@@ -58,7 +73,7 @@ class Gcode:
             out += f" S{temperature}"
         self.file.write(out + "\n")
 
-    def travel(self, delta=(0.0, 0.0, 0.0), feedrate=2400):
+    def travel(self, delta: Tuple[float, float, float], feedrate: int = 2400):
         self.pos[0] += delta[0]
         self.pos[1] += delta[1]
         self.pos[2] += delta[2]
@@ -70,9 +85,9 @@ class Gcode:
         self,
         i: float,
         j: float,
-        delta=(0.0, 0.0, 0.0),
-        clockwise=True,
-        feedrate=2400,
+        delta: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        clockwise: bool = True,
+        feedrate: int = 2400,
     ):
         self.draw_arc(0.0, i, j, delta, clockwise, feedrate)
 
@@ -80,12 +95,14 @@ class Gcode:
         self,
         r: float,
         delta: Tuple[float, float, float],
-        clockwise=True,
-        feedrate=2400,
+        clockwise: bool = True,
+        feedrate: int = 2400,
     ):
         self.draw_arc_r(0.0, r, delta, clockwise, feedrate)
 
-    def travel_absolute(self, location: Tuple[float, float, float], feedrate=2400):
+    def travel_absolute(
+        self, location: Tuple[float, float, float], feedrate: int = 2400
+    ):
         self.pos[0] = location[0]
         self.pos[1] = location[1]
         self.pos[2] = location[2]
@@ -93,31 +110,37 @@ class Gcode:
             f"G0 F{feedrate} X{self.pos[0]} Y{self.pos[1]} Z{self.pos[2]}\n"
         )
 
-    def draw(self, e: float, delta: Tuple[float, float, float], feedrate=2400):
+    def draw(
+        self, delta: Tuple[float, float, float], e: float = None, feedrate: int = 2400
+    ):
+        if e is None:
+            e = 0  # REPLACE
         self.pos[0] += delta[0]
         self.pos[1] += delta[1]
         self.pos[2] += delta[2]
-        self.pos[3] += e
+        self.e += e
         self.file.write(
-            f"G1 F{feedrate} X{self.pos[0]} Y{self.pos[1]} Z{self.pos[2]} E{self.pos[3]}\n"
+            f"G1 F{feedrate} X{self.pos[0]} Y{self.pos[1]} Z{self.pos[2]} E{self.e}\n"
         )
 
     def draw_arc(
         self,
-        e: float,
         i: float,
         j: float,
-        delta=(0.0, 0.0, 0.0),
-        clockwise=True,
-        feedrate=2400,
+        delta: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+        e: float = None,
+        clockwise: bool = True,
+        feedrate: int = 2400,
     ):
+        if e is None:
+            e = 0  # REPLACE
         out = "G2" if clockwise else "G3"
         out += f" F{feedrate}"
         self.pos[0] += delta[0]
         self.pos[1] += delta[1]
         self.pos[2] += delta[2]
-        self.pos[3] += e
-        out += f" I{i} J{j} E{self.pos[3]}"
+        self.e += e
+        out += f" I{i} J{j} E{self.e}"
         if delta[0] != 0.0:
             out += f" X{self.pos[0]}"
         if delta[1] != 0.0:
@@ -128,12 +151,14 @@ class Gcode:
 
     def draw_arc_r(
         self,
-        e: float,
         r: float,
         delta: Tuple[float, float, float],
-        clockwise=True,
-        feedrate=2400,
+        e: float = None,
+        clockwise: bool = True,
+        feedrate: int = 2400,
     ):
+        if e is None:
+            e = 0  # REPLACE
         if delta[0] == 0.0 and delta[1] == 0.0:
             raise ValueError("Both x and y cannot be 0. Make sure to set at least one!")
         out = "G2" if clockwise else "G3"
@@ -141,8 +166,8 @@ class Gcode:
         self.pos[0] += delta[0]
         self.pos[1] += delta[1]
         self.pos[2] += delta[2]
-        self.pos[3] += e
-        out += f" R{r} E{self.pos[3]}"
+        self.e += e
+        out += f" R{r} E{self.e}"
         if delta[0] != 0.0:
             out += f" X{self.pos[0]}"
         if delta[1] != 0.0:
@@ -150,3 +175,21 @@ class Gcode:
         if delta[2] != 0.0:
             out += f" Z{self.pos[2]}"
         self.file.write(out + "\n")
+
+    def draw_func(
+        self,
+        func: Callable[
+            [float], Tuple[Tuple[float, float, float], float, Union[int, None]]
+        ],
+        start: float = 0.0,
+        end: float = 1.0,
+        nsamples: int = 1000,
+    ):
+        scale = (end - start) / nsamples
+        for i in range(0, nsamples):
+            t = start + i * scale
+            pos, e, feed = func(t)
+            if feed is not None:
+                self.draw(pos, e=e, feedrate=feed)
+            else:
+                self.draw(pos, e=e)
