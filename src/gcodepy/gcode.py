@@ -1,9 +1,11 @@
 from typing import Callable, Tuple, Union
+import math
 from . import util
 
-# circumference calcs for arcs
+# TODO:
 # minimize feedrate output
 # draw absolute
+# catch more invalid inputs
 class Gcode:
     def __init__(
         self,
@@ -92,9 +94,14 @@ class Gcode:
         self.pos[0] += delta[0]
         self.pos[1] += delta[1]
         self.pos[2] += delta[2]
-        self.file.write(
-            f"G0 F{feedrate} X{self.pos[0]} Y{self.pos[1]} Z{self.pos[2]}\n"
-        )
+        out = f"G0 F{feedrate}"
+        if delta[0] != 0.0:
+            out += f" X{self.pos[0]}"
+        if delta[1] != 0.0:
+            out += f" Y{self.pos[1]}"
+        if delta[2] != 0.0:
+            out += f" Z{self.pos[2]}"
+        self.file.write(out + "\n")
 
     def travel_arc(
         self,
@@ -139,9 +146,15 @@ class Gcode:
         self.pos[1] += delta[1]
         self.pos[2] += delta[2]
         self.e += e
-        self.file.write(
-            f"G1 F{feedrate} X{self.pos[0]} Y{self.pos[1]} Z{self.pos[2]} E{self.e}\n"
-        )
+        out = f"G1 F{feedrate}"
+        if delta[0] != 0.0:
+            out += f" X{self.pos[0]}"
+        if delta[1] != 0.0:
+            out += f" Y{self.pos[1]}"
+        if delta[2] != 0.0:
+            out += f" Z{self.pos[2]}"
+        out += f" E{e}"
+        self.file.write(out + "\n")
 
     def draw_arc(
         self,
@@ -154,7 +167,7 @@ class Gcode:
     ):
         if e is None:
             e = self.extrusion_length_calculator(
-                util.dist(delta),  # REPLACE
+                util.arclen((i, j), delta[:2], clockwise),
                 self.line_width,
                 self.layer_height,
                 self.filament_width,
@@ -182,9 +195,19 @@ class Gcode:
         clockwise: bool = True,
         feedrate: int = 2400,
     ):
+        if r == 0 or r is None:
+            raise ValueError("Radius r cannot be 0 or None.")
         if e is None:
+            d2 = (delta[0] / 2, delta[1] / 2)
+            m = -1 if clockwise ^ (r < 0) else 1
+            l = util.dist(d2)
+            h2 = (r - l) * (r + l)
+            h = 0 if h2 < 0 else math.sqrt(h2)
+            s = (-d2[1], d2[0])
+            s = [s[i] / l * m * h for i in range(2)]
+            center = tuple(d2[i] + s[i] for i in range(2))
             e = self.extrusion_length_calculator(
-                util.dist(delta),  # REPLACE
+                util.arclen(center, delta[:2], clockwise),
                 self.line_width,
                 self.layer_height,
                 self.filament_width,
