@@ -18,7 +18,15 @@ $ pip3 install gcodepy
 ```
 Note that `gcodepy` has only been tested with Python 3.X and no guarantees are made about compatibility with the deprecated Python 2.X.
 
+## Examples
+One of the most interesting things to do with `gcodepy` is to do toolhead movements using mathematical functions.
+For example, you can make your printer go in a spiral:
+![zspiral image](imgs/zspiral.png)
+This example is defined in `examples/zspiral.py`.
+For more examples, check the `examples` folder.
+
 ## Planned features
-- cleaner interfacing for absolute movements
-- more examples
+- cleaner gcode output (particularly feedrates)
+- better interfacing for absolute movements
+- better detection + handling of invalid inputs/movements
 

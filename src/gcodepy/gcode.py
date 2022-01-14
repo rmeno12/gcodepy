@@ -5,6 +5,7 @@ from . import util
 # TODO:
 # minimize feedrate output
 # draw absolute
+# travel func
 # catch more invalid inputs
 class Gcode:
     def __init__(
