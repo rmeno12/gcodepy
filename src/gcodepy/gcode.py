@@ -232,17 +232,22 @@ class Gcode:
     def draw_func(
         self,
         func: Callable[
-            [float], Tuple[Tuple[float, float, float], float, Union[int, None]]
+            [float],
+            Tuple[Tuple[float, float, float], Union[float, None], Union[int, None]],
         ],
         start: float = 0.0,
         end: float = 1.0,
         nsamples: int = 1000,
     ):
         scale = (end - start) / nsamples
+        start_pos = (self.get_x(), self.get_y(), self.get_z())
+        last_pos = start_pos
         for i in range(0, nsamples):
             t = start + i * scale
-            pos, e, feed = func(t)
+            start_delta, e, feed = func(t)
+            delta = [start_delta[i] + start_pos[i] - last_pos[i] for i in range(3)]
             if feed is not None:
-                self.draw(pos, e=e, feedrate=feed)
+                self.draw(delta, e=e, feedrate=feed)
             else:
-                self.draw(pos, e=e)
+                self.draw(delta, e=e)
+            last_pos = (self.get_x(), self.get_y(), self.get_z())
